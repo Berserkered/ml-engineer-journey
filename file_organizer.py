@@ -1,5 +1,5 @@
-import os
-import shutil
+from pathlib import Path
+import argparse
 
 FILE_CATEGORIES = {
     "Images" : [".jpg", ".png", ".jpeg", ".gif"],
@@ -11,31 +11,47 @@ FILE_CATEGORIES = {
     "Misc" : []
 }
 
-def organize_files(directory):
-    """Organizes files in the given directory based on their file type"""
-    if not os.path.isdir(directory):
+EXTENSION_TO_CATEGORY = {
+    ext: category
+    for category, extensions in FILE_CATEGORIES.items()
+    for ext in extensions
+}
+
+def organize_files(directory: Path, dry_run: bool = False, recursive: bool = False) -> None:
+    """Organize files in the given directory by file type."""
+    if not directory.is_dir():
         print(f"Error: {directory} is not a valid directory")
         return 
-    
+ 
     for category in FILE_CATEGORIES:
-        folder_path = os.path.join(directory, category)
-        os.makedirs(folder_path, exist_ok=True)
+        (directory / category).mkdir(exist_ok=True)
 
-    for filename in os.listdir(directory):
-        file_path = os.path.join(directory, filename)
-        
-        if os.path.isdir(file_path):
+    category_dirs = {directory / c for c in FILE_CATEGORIES}
+
+    if recursive:
+        paths = directory.rglob("*")
+    else:
+        paths = directory.iterdir()
+
+    for path in paths:
+        if not path.is_file():
             continue
+        if any(parent in category_dirs for parent in path.parents):
+            continue  # already organized — skip
 
-        file_moved = False
-        for category, extensions in FILE_CATEGORIES.items():
-            if any(filename.lower().endswith(ext) for ext in extensions):
-                shutil.move(file_path, os.path.join(directory, category, filename))
-                file_moved = True
-                break
+        category = EXTENSION_TO_CATEGORY.get(path.suffix.lower(), "Misc")
+        destination = directory / category / path.name
 
-        if not file_moved:
-            shutil.move(file_path, os.path.join(directory, "Misc", filename))
+        if dry_run:
+            print(f"Would move: {path.name} -> {category}/")
+        else:
+            path.rename(destination)
     
-directory_to_organize = input("Enter the directory path to organize: ")
-organize_files(directory_to_organize)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Organize files by type.")
+    parser.add_argument("directory", type=Path, help="Directory to organize")
+    parser.add_argument("--dry-run", action="store_true", help="Preview without moving")
+    parser.add_argument("--recursive", action="store_true", help="Include subdirectories")
+    args = parser.parse_args()
+
+    organize_files(args.directory, dry_run=args.dry_run, recursive=args.recursive)
