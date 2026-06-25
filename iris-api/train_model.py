@@ -13,5 +13,8 @@ model.fit(X_train, y_train)
 
 print(f"Test accuracy: {model.score(X_test, y_test)}")
 
-joblib.dump(model, "model.joblib")
+joblib.dump(
+    {"model": model, "target_names": list(iris.target_names)},
+    "model.joblib",
+)
 print("Saved model.joblib")
